@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Values Survey 2075</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; }
+    h2 { color: #333; }
+    .plot { width: 100%; height: 450px; margin-bottom: 30px; }
+    .slider-group { margin-bottom: 10px; }
+    label { display: block; font-weight: bold; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+  <h2>Values Survey: Now and 2075</h2>
+  <p>Move the sliders so they add up to about 100. Then click “Submit”.</p>
+  <p><em>By submitting, you agree that your anonymous data may be used for a university project.</em></p>
+
+  <!-- Present plot -->
+  <h3>Present-day values</h3>
+  <div id="plot-now" class="plot"></div>
+  <div>
+    <div class="slider-group">
+      <label>Truth (<span id="a-now">33</span>)</label>
+      <input id="a-now-slider" type="range" min="0" max="100" value="33">
+    </div>
+    <div class="slider-group">
+      <label>Technology (<span id="b-now">33</span>)</label>
+      <input id="b-now-slider" type="range" min="0" max="100" value="33">
+    </div>
+    <div class="slider-group">
+      <label>Wellbeing (<span id="c-now">34</span>)</label>
+      <input id="c-now-slider" type="range" min="0" max="100" value="34">
+    </div>
+    <button id="submit-now">Submit Present Values</button>
+    <p id="msg-now" style="color:green"></p>
+  </div>
+
+  <hr>
+
+  <!-- Future plot -->
+  <h3>Values in 2075</h3>
+  <div id="plot-future" class="plot"></div>
+  <div>
+    <div class="slider-group">
+      <label>Truth(<span id="a-future">33</span>)</label>
+      <input id="a-future-slider" type="range" min="0" max="100" value="33">
+    </div>
+    <div class="slider-group">
+      <label>Technology (<span id="b-future">33</span>)</label>
+      <input id="b-future-slider" type="range" min="0" max="100" value="33">
+    </div>
+    <div class="slider-group">
+      <label>Wellbeing (<span id="c-future">34</span>)</label>
+      <input id="c-future-slider" type="range" min="0" max="100" value="34">
+    </div>
+    <button id="submit-future">Submit 2075 Values</button>
+    <p id="msg-future" style="color:green"></p>
+  </div>
+
+<script>
+/* === Step 1: add your Supabase info here === */
+const SUPABASE_URL = "https://zwozzioucndjackuuwgn.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3b3p6aW91Y25kamFja3V1d2duIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NDMxODQsImV4cCI6MjA3NjUxOTE4NH0.F_HOzip__lxESZdpZ9otQy5QT45zywAZwdv_18EXXto";
+/* ========================================== */
+
+/* helper: normalise to total 100 */
+function normalize(a,b,c){
+  let total = a+b+c;
+  if(total === 0) return [0,0,0];
+  return [Math.round(a/total*100), Math.round(b/total*100), 100 - Math.round(a/total*100) - Math.round(b/total*100)];
+}
+
+/* draw ternary plot */
+function drawPlot(id, a,b,c){
+  Plotly.newPlot(id, [{
+    type:'scatterternary',
+    mode:'markers',
+    a:[a], b:[b], c:[c],
+    marker:{size:10, color:'blue'}
+  }], {
+    ternary:{ sum:100,
+      aaxis:{title:'Truth'},
+      baxis:{title:'Technology'},
+      caxis:{title:'Wellbeing'}
+    }
+  });
+}
+
+/* set up sliders */
+function setup(prefix){
+  const sA=document.getElementById('a-'+prefix+'-slider');
+  const sB=document.getElementById('b-'+prefix+'-slider');
+  const sC=document.getElementById('c-'+prefix+'-slider');
+  const tA=document.getElementById('a-'+prefix);
+  const tB=document.getElementById('b-'+prefix);
+  const tC=document.getElementById('c-'+prefix);
+  function update(){
+    const vals=normalize(+sA.value,+sB.value,+sC.value);
+    [tA.innerText,tB.innerText,tC.innerText]=vals;
+    drawPlot('plot-'+prefix, ...vals);
+  }
+  sA.oninput=sB.oninput=sC.oninput=update;
+  update();
+}
+setup('now');
+setup('future');
+
+/* send to Supabase */
+async function sendData(when,a,b,c){
+  const data = [{ when:when, v1:a, v2:b, v3:c }];
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/Responses`, {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'apikey':SUPABASE_KEY,
+      'Authorization':'Bearer '+SUPABASE_KEY,
+      'Prefer':'return=minimal'
+    },
+    body:JSON.stringify(data)
+  });
+  return res.ok;
+}
+
+/* submit buttons */
+document.getElementById('submit-now').onclick = async ()=>{
+  const a=+document.getElementById('a-now').innerText;
+  const b=+document.getElementById('b-now').innerText;
+  const c=+document.getElementById('c-now').innerText;
+  if(await sendData('present',a,b,c)){
+    document.getElementById('msg-now').innerText='Saved!';
+  }
+};
+document.getElementById('submit-future').onclick = async ()=>{
+  const a=+document.getElementById('a-future').innerText;
+  const b=+document.getElementById('b-future').innerText;
+  const c=+document.getElementById('c-future').innerText;
+  if(await sendData('2075',a,b,c)){
+    document.getElementById('msg-future').innerText='Saved!';
+  }
+};
+</script>
+</body>
+</html>
